@@ -9,45 +9,6 @@
 #include	<inttypes.h>
 #include        "soc.h"
 
-
-/*
- * Set up select(2) on both socket and terminal, anything that comes
- * in on socket goes to terminal, anything that gets typed on terminal
- * goes out socket...
- */
-	while (!done) {
-		FD_ZERO(&ready);
-		FD_SET(sock, &ready);
-		FD_SET(fileno(stdin), &ready);
-		if (select((sock + 1), &ready, 0, 0, 0) < 0) {
-			printf("IF: level 1");
-			perror("select");
-			exit(1);
-		}
-		if (FD_ISSET(fileno(stdin), &ready)) {
-			printf("IF: level 2");
-			if ((bytes = read(fileno(stdin), buf, BUF_LEN)) <= 0)
-				done++;
-			send(sock, buf, bytes, 0);
-		}
-		msgsize = sizeof(msgfrom);
-		if (FD_ISSET(sock, &ready)) {
-			printf("IF: level 3");
-			if ((bytes = recvfrom(sock, buf, BUF_LEN, 0, (struct sockaddr *)&msgfrom, &msgsize)) <= 0) {
-				done++;
-			} else if (aflg) {
-				fromaddr.addr = ntohl(msgfrom.sin_addr.s_addr);
-				fprintf(stderr, "%d.%d.%d.%d: ", 0xff & (unsigned int)fromaddr.bytes[0],
-			    	0xff & (unsigned int)fromaddr.bytes[1],
-			    	0xff & (unsigned int)fromaddr.bytes[2],
-			    	0xff & (unsigned int)fromaddr.bytes[3]);
-			}
-			write(fileno(stdout), buf, bytes);
-		}
-	}
-	return(0);
-}
-
 /*
  * setup_client() - set up socket for the mode of soc running as a
  *		client connecting to a port on a remote machine.
