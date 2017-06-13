@@ -26,24 +26,30 @@ main(int argc,char *argv[])
 		progname = argv[0];
 	else
 		progname++;
-	while ((ch = getopt(argc, argv, "adsp:h:")) != -1)
+	while ((ch = getopt(argc, argv, "dhl:p:r:t:n:s:")) != -1)
 		switch(ch) {
-			case 'a':
+			case 'd':
 				aflg++;		/* print address in output */
 				break;
-			case 'd':
+			case 'h':
 				soctype = SOCK_DGRAM;
 				break;
-			case 's':
+			case 'l':
 				server = 1;
 				break;
 			case 'p':
 				port = optarg;
 				break;
-			case 'h':
+			case 'r':
 				host = optarg;
 				break;
-			case '?':
+			case 't':
+                            
+                                break;
+                        case 'n' :
+                                break;
+                        case 's' :
+                                break;
 			default:
 				usage();
 		}
