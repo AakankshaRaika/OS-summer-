@@ -20,6 +20,31 @@ static char svnid[] = "$Id: soc.c 6 2009-07-03 03:18:54Z kensmith $";
 #include	<inttypes.h>
 #include        <unistd.h>
 #include        <netdb.h>
+#include        <iostream>
+
+using namespace std;
+
+char *progname;
+char buf[BUF_LEN];
+
+void usage();
+int setup_client();
+int setup_server();
+
+int s, sock, ch, server, done, bytes, aflg;
+int soctype = SOCK_STREAM;
+char *host = NULL;
+char *port = NULL;
+extern char *optarg;
+extern int optind;
+
+struct FILES_DETAILS{
+        int time;
+        int file_size;
+        string file_name;
+        string GET_HEAD;
+        string option;
+}files_d;
 
 char *progname;
 char buf[BUF_LEN];
