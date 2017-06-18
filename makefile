@@ -5,4 +5,4 @@ all : main
 main.o : main.cpp
 	g++ -Wall -c main.cpp
 clean: 
-	$(RM) soc
+	$(RM) all
