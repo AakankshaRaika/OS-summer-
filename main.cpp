@@ -1,4 +1,14 @@
-#include "soc.h"
+/*
+ * soc.c - program to open sockets to remote machines
+ *
+ * $Author: kensmith $
+ * $Id: soc.c 6 2009-07-03 03:18:54Z kensmith $
+ */
+
+//static char svnid[] = "$Id: soc.c 6 2009-07-03 03:18:54Z kensmith $";
+
+#define	BUF_LEN	8192
+
 #include	<stdio.h>
 #include	<stdlib.h>
 #include	<string.h>
@@ -10,10 +20,50 @@
 #include	<inttypes.h>
 #include        <unistd.h>
 #include        <netdb.h>
+#include	<iostream>
+#include	<pthread.h>
+#include	<time.h>
+#include	<queue>
+#include	<ctime>
+using namespace std;
+
+struct FILES_DETAILS{
+	time_t timer;
+        int file_size;
+        string file_name;
+        string GET_HEAD;
+        string option;
+};
+bool sjf = false;
+
+bool operator<(const FILES_DETAILS& lhs, const FILES_DETAILS& rhs){
+	if(sjf == true){
+		return lhs.file_size < rhs.file_size;
+	}
+	else{
+		return 0; 
+	}
+} 
+
+
+char *progname;
+char buf[BUF_LEN];
+void usage();
+int setup_client();
+int setup_server();
+
+int s, sock, ch, server, done, bytes, aflg;
+int soctype = SOCK_STREAM;
+char *host = NULL;
+char *port = NULL;
+extern char *optarg;
+extern int optind;
 
 int
 main(int argc,char *argv[])
 {
+	time_t timer;
+	priority_queue<FILES_DETAILS> q;
 	fd_set ready;
 	struct sockaddr_in msgfrom;
 	socklen_t msgsize;
@@ -26,30 +76,24 @@ main(int argc,char *argv[])
 		progname = argv[0];
 	else
 		progname++;
-	while ((ch = getopt(argc, argv, "dhl:p:r:t:n:s:")) != -1)
+	while ((ch = getopt(argc, argv, "adsp:h:")) != -1)
 		switch(ch) {
-			case 'd':
+			case 'a':
 				aflg++;		/* print address in output */
 				break;
-			case 'h':
+			case 'd':
 				soctype = SOCK_DGRAM;
 				break;
-			case 'l':
+			case 's':
 				server = 1;
 				break;
 			case 'p':
 				port = optarg;
 				break;
-			case 'r':
+			case 'h':
 				host = optarg;
 				break;
-			case 't':
-                            
-                                break;
-                        case 'n' :
-                                break;
-                        case 's' :
-                                break;
+			case '?':
 			default:
 				usage();
 		}
@@ -81,22 +125,27 @@ main(int argc,char *argv[])
 		FD_SET(sock, &ready);
 		FD_SET(fileno(stdin), &ready);
 		if (select((sock + 1), &ready, 0, 0, 0) < 0) {
-			printf("IF: level 1");
-			perror("select");
+			cerr << ("IF: level 1");
+			cerr << ("select");
 			exit(1);
 		}
+		//client setup
 		if (FD_ISSET(fileno(stdin), &ready)) {
-			printf("IF: level 2");
-			if ((bytes = read(fileno(stdin), buf, BUF_LEN)) <= 0)
-				done++;
-			send(sock, buf, bytes, 0);
+			cerr << ("IF: level 2");
+			buf[0] = '5';
+                        send(sock, buf, bytes, 0);
 		}
 		msgsize = sizeof(msgfrom);
+		//Server setup
 		if (FD_ISSET(sock, &ready)) {
-			printf("IF: level 3");
+			cerr << ("IF: level 3");
 			if ((bytes = recvfrom(sock, buf, BUF_LEN, 0, (struct sockaddr *)&msgfrom, &msgsize)) <= 0) {
-				done++;
+				FILES_DETAILS *tempStruct;
+                                tempStruct->timer = time(&timer);
+				cerr << "In bytes"  << endl;
+                                done++;
 			} else if (aflg) {
+				cerr << "In aflg" << endl;
 				fromaddr.addr = ntohl(msgfrom.sin_addr.s_addr);
 				fprintf(stderr, "%d.%d.%d.%d: ", 0xff & (unsigned int)fromaddr.bytes[0],
 			    	0xff & (unsigned int)fromaddr.bytes[1],
@@ -104,8 +153,109 @@ main(int argc,char *argv[])
 			    	0xff & (unsigned int)fromaddr.bytes[3]);
 			}
 			write(fileno(stdout), buf, bytes);
+
 		}
 	}
 	return(0);
 }
 
+/*
+ * setup_client() - set up socket for the mode of soc running as a
+ *		client connecting to a port on a remote machine.
+ */
+
+int
+setup_client() {
+
+	struct hostent *hp;
+	struct sockaddr_in serv;
+	struct servent *se;
+
+/*
+ * Look up name of remote machine, getting its address.
+ */
+	if ((hp = gethostbyname(host)) == NULL) {
+		fprintf(stderr, "%s: %s unknown host\n", progname, host);
+		exit(1);
+	}
+/*
+ * Set up the information needed for the socket to be bound to a socket on
+ * a remote host.  Needs address family to use, the address of the remote
+ * host (obtained above), and the port on the remote host to connect to.
+ */
+	serv.sin_family = AF_INET;
+	memcpy(&serv.sin_addr, hp->h_addr, hp->h_length);
+	if (isdigit(*port))
+		serv.sin_port = htons(atoi(port));
+	else {
+		if ((se = getservbyname(port, (char *)NULL)) < (struct servent *) 0) {
+			perror(port);
+			exit(1);
+		}
+		serv.sin_port = se->s_port;
+	}
+/*
+ * Try to connect the sockets...
+ */
+	if (connect(s, (struct sockaddr *) &serv, sizeof(serv)) < 0) {
+		perror("connect");
+		exit(1);
+	} else
+		fprintf(stderr, "Connected...\n");
+	return(s);
+}
+
+/*
+ * setup_server() - set up socket for mode of soc running as a server.
+ */
+
+int
+setup_server() {
+	struct sockaddr_in serv, remote;
+	struct servent *se;
+	int newsock;
+        socklen_t len;
+
+	len = sizeof(remote);
+	memset((void *)&serv, 0, sizeof(serv));
+	serv.sin_family = AF_INET;
+	if (port == NULL)
+		serv.sin_port = htons(0);
+	else if (isdigit(*port))
+		serv.sin_port = htons(atoi(port));
+	else {
+		if ((se = getservbyname(port, (char *)NULL)) < (struct servent *) 0) {
+			perror(port);
+			exit(1);
+		}
+		serv.sin_port = se->s_port;
+	}
+	if (bind(s, (struct sockaddr *)&serv, sizeof(serv)) < 0) {
+		perror("bind");
+		exit(1);
+	}
+	if (getsockname(s, (struct sockaddr *) &remote, &len) < 0) {
+		perror("getsockname");
+		exit(1);
+	}
+	fprintf(stderr, "Port number is %d\n", ntohs(remote.sin_port));
+	listen(s, 1);
+	newsock = s;
+	if (soctype == SOCK_STREAM) {
+		fprintf(stderr, "Entering accept() waiting for connection.\n");
+		newsock = accept(s, (struct sockaddr *) &remote, &len);
+	}
+	return(newsock);
+}
+
+/*
+ * usage - print usage string and exit
+ */
+
+void
+usage()
+{
+	fprintf(stderr, "usage: %s -h host -p port\n", progname);
+	fprintf(stderr, "usage: %s -s [-p port]\n", progname);
+	exit(1);
+}
