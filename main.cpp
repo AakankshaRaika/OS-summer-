@@ -77,11 +77,12 @@ string formatDate(time_t *time);
 struct sockaddr_in remote;
 int s, sock, bytes, ch, n = 4, t = 10;
 int soctype = SOCK_STREAM;
+//Can not be hardcoded to a directory
 string dir = getenv("HOME") != NULL ? getenv("HOME") : "/home/jayati/";
 char *port = NULL;
 char *sched = NULL;
 extern char *optarg;
-bool d = false;
+bool d = false;                                             //Debug
 string logFile;
 bool log;
 extern int optind;
@@ -132,31 +133,32 @@ main(int argc, char *argv[]) {
     else
         progname++;
     while ((ch = getopt(argc, argv, "dhl:p:r:t:n:s")) != -1)//need to modify this completely!
+    /*AR : H is not done yet COMPLETE THIS*/
         switch (ch) {
-            case 'r':
+            case 'r':                                                  /*Redirecting to a new directing*/
                 dir = optarg;
                 break;
-            case 'd':
+            case 'd':                                                  /*Debuging mode*/
                 d = true;
                 break;
-            case 'l':
+            case 'l':                                                  /*Logging*/
                 logFile = string(optarg);
                 logger.open(logFile);
                 log = true;
                 if (logger)
                     logger << "Logging the requests...." << endl;
                 break;
-            case 'p':
+            case 'p':                                                  /*Changing port number*/
                 port = optarg;
                 break;
-            case 'n':
+            case 'n':                                                  /*Number of threads*/
                 n = atoi(optarg);
                 break;
-            case 's':
+            case 's':                                                  /*Scheduling*/
                 if (string(optarg) == "SJF")
                     sjf = true;
                 break;
-            case 't':
+            case 't':                                                  /*Queing Time delay*/
                 t = atoi(optarg);
                 break;
             default:
@@ -172,18 +174,21 @@ main(int argc, char *argv[]) {
         perror("socket");
         exit(1);
     }
-    //good practice if you are implementing support for multiple clients
-    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &opt,
-            sizeof (opt)) < 0) {
+    
+    //supports multiple clients
+    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &opt, sizeof (opt)) < 0) {
         perror("setsockopt");
         exit(EXIT_FAILURE);
     }
+    
     sock = setup_server();
+    
     /*
      * Set up select(2) on both socket and terminal, anything that comes
      * in on socket goes to terminal, anything that gets typed on terminal
      * goes out socket...
      */
+    
     //creating the scheduler thread
     start_time = time(NULL);
     pthread_t scheduler_thread;
@@ -193,21 +198,23 @@ main(int argc, char *argv[]) {
     } else {
         cerr << "MAIN: Scheduler Thread Created!" << endl;
     }
+    
     //creating the thread_pool
     pthread_t threads[n];
-    //Could also keep a count of number of threads executing and upon termination 
+    //keeps count of number of threads executing and upon termination 
     for (int i = 0; i < n; i++) {
         pthread_create(&threads[i], NULL, worker, (void*) i);
         cerr << "MAIN: Worker thread #" + to_string(i) + " created!" << endl;
     }
+    
     while (true) {
         cerr << "MAIN: Establishing Connection.." << endl;
         //accepting connections continuosly
         if (d && no_of_conn >= 1) {
             continue;
         }
-        if (soctype == SOCK_STREAM) {//check this condition again!!!*******
-            fprintf(stderr, "Entering accept() waiting for connection.\n");
+        if (soctype == SOCK_STREAM) {//check this condition again!!!*******  *AR : TODO : This is incomplete? 
+        fprintf(stderr, "Entering accept() waiting for connection.\n");
             sock = accept(s, (struct sockaddr *) &remote, &len);
         }
         cerr << "MAIN: Connection established.." << endl;
@@ -228,19 +235,19 @@ main(int argc, char *argv[]) {
                 if (log)
                     logger << string(buf) << endl;
                 FILE_DETAILS file; //temp file_details variable to store the request parameters
-                char* request = strtok(buf, " "); //split the request by space 
+                char* request = strtok(buf, " "); //split the request by space /*AR : Is the last option being handled properly */
                 cerr << "MAIN: Request received " << endl;
-                file.GET = strcmp(request, "GET") == 0 ? true : false; //check if the request is of type head or get
+                file.GET = strcmp(request, "GET") == 0 ? true : false; //checks if the request is of type head or get
                 cerr << "MAIN: Request type " << to_string(file.GET) << endl;
                 request = strtok(NULL, " ");
-                file.file_name = string(request); //extract the file name from the request
-                file.client_socket = sock; //save the socket infomartion 
+                file.file_name = string(request); //extracts the file name from the request
+                file.client_socket = sock; //saves the socket infomartion 
                 file.arv_time = time(NULL);
                 file.file_size = file.GET == true ? dir_listing.find(file.file_name)->second : 0;
                 cerr << "MAIN: file size from the directory listing" << to_string(dir_listing.find(file.file_name)->second) << endl;
                 cerr << "MAIN: inserting in ready queue" << endl;
                 insertInQueue(&file); //insert the request in the ready queue
-
+                /*AR : what about the options?*/
             } else {
                 if (no_of_conn > 0)
                     no_of_conn--;
@@ -251,30 +258,27 @@ main(int argc, char *argv[]) {
 }
 
 void insertInQueue(FILE_DETAILS *file) {
-
     m.lock();
-    cerr << "inserted request in ready queue!" << endl;
-    ready_queue.push(*file); //push req in ready queue
+    cerr << "inserting request in ready queue!" << endl;
+    ready_queue.push(*file); //pushs req in ready queue
     m.unlock();
 }
 
 void *scheduler(void* threadid) {
     cerr << "SCHED: inside scheduler : wait time in secs = " << to_string(t) << endl;
-    while (difftime(time(NULL), start_time) < t);
+    while (difftime(time(NULL), start_time) < t); /*AR: Why is the difference of time being checked?*/
     while (true) {
         m.lock();
         c.lock();
         // ready_queue.size > 0, thread_pool,size > 0 -> pass request to worker
         if (ready_queue.size() > 0 && count < n) {
-            //lock this shared variable that will store the current request being scheduled by the scheduler
-
+            //Meeting notes : lock this shared variable that will store the current request being scheduled by the scheduler
             count++;
             p.lock();
             cerr << "SCHED: readyqueue size 1: " << ready_queue.size() << endl;
             cerr << "SCHED: count 1: " << count << endl;
-
             pass_req = (FILE_DETAILS *) & ready_queue.top();
-            ready_queue.pop(); //initialize the shared variable to top element of the ready queue
+            ready_queue.pop(); //initializes the shared variable to top element of the ready queue
             p.unlock();
         }
         c.unlock();
@@ -310,6 +314,7 @@ void *worker(void* threadid) {
             if (!open_file.is_open()) {
                 status = 404;
                 cerr << "WORKER " << tid << " requested file not found" << endl;
+                /*AR : Isnt this hard coding? We neeed to use variables*/
                 open_file.open("directory.txt");
                 if (!open_file.is_open()) {
                     cerr << "WORKER " << tid << " directory file not found" << endl;
@@ -331,6 +336,7 @@ void *worker(void* threadid) {
         } else {
             status = 200;
         }
+        /*AR : The below code helps get the Meta data*/
         if (stat(f->file_name.c_str(), &info) == 0) {
             string file_type = f->file_name.substr(f->file_name.find_last_of(".") + 1);
             if (file_type == "txt") {
@@ -377,8 +383,6 @@ void *worker(void* threadid) {
             send(f->client_socket, s.c_str(), strlen(s.c_str()), 0);
             cerr << "WORKER " << tid << " sent response to client : " << s << endl;
         }
-
-
     }
 }
 
@@ -447,23 +451,18 @@ setup_server() {
         perror("getsockname");
         exit(1);
     }
-
     fprintf(stderr, "Port number is %d\n", ntohs(remote.sin_port));
-
     if (listen(s, 5) < 0) {
         perror("listen");
         exit(1);
     }
-
     newsock = s;
-
     return (newsock);
 }
 
 string formatDate(time_t * time) {
     char buffer[100];
     strftime(buffer, 100, "%a, %d %b %Y %T %Z", localtime(time));
-
     return buffer;
 }
 
