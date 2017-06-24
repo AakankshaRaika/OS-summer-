@@ -15,4 +15,4 @@ clean:
         \rm *.o *~ p1
 
 tar:
-        tar cfv p1.tar maon.cpp
+        tar cfv p1.tar main.cpp
