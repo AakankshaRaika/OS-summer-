@@ -1,9 +1,18 @@
+OBJS = main.o
+CC = g++
+DEBUG = -g
+CFLAGS = -Wall -c $(DEBUG)
+LFLAGS = -Wall $(DEBUG)
+LDFLAGS=-pthread
 
-# build an executable named soc from soc.c
+p1 : $(OBJS)
+        $(CC) $(LFLAGS) $(OBJS) -o p1 $(LDFLAGS)
 
-main.o : main.cpp soc.cpp soc.h
-        g++ -Wall -c main.cpp
-soc : soc.o main.o
-        g++ -Wall soc.o main.o -o soc
+main.o : main.cpp
+        $(CC) $(CFLAGS) main.cpp
+
 clean:
-        $(RM) soc
+        \rm *.o *~ p1
+
+tar:
+        tar cfv p1.tar maon.cpp
