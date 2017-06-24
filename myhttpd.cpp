@@ -71,7 +71,6 @@ mutex c; // to protect the shared variable count
 //directory information
 map<string, int> dir_listing;
 
-
 /***************************************************
  * Struct Declarations
  ***************************************************/
@@ -108,7 +107,6 @@ struct HTTP_RESPONSE {
     char* content;
 };
 
-
 /***************************************************
  * Ready Queue ordering and initialization
  ***************************************************/
@@ -118,9 +116,9 @@ struct Order {
 
     bool operator()(const FILE_DETAILS &req1, const FILE_DETAILS &req2) {
         if (!sjf)
-            return difftime(req1.arv_time, req2.arv_time) < 0;
+            return difftime(req1.arv_time, req2.arv_time) > 0;
         else if (req1.file_size == req2.file_size)
-            return difftime(req1.arv_time, req2.arv_time) < 0;
+            return difftime(req1.arv_time, req2.arv_time) > 0;
         return req1.file_size > req2.file_size;
     }
 };
@@ -172,9 +170,9 @@ main(int argc, char *argv[]) {
                 port = optarg;
                 break;
             case 'n': //done
-                cerr << "MAIN in N" << endl;
+                //cerr << "MAIN in N" << endl;
                 n = atoi(optarg);
-                cerr << "MAIN in N received : " << to_string(n) << endl;
+                //cerr << "MAIN in N received : " << to_string(n) << endl;
                 break;
             case 's': //test
                 if (string(optarg) == "SJF")
@@ -249,7 +247,7 @@ main(int argc, char *argv[]) {
         //cerr << "MAIN: Establishing Connection.." << endl;
 
         if (soctype == SOCK_STREAM) {
-            fprintf(stderr, "Entering accept() waiting for connection.\n");
+            //fprintf(stderr, "Entering accept() waiting for connection.\n");
             sock = accept(s, (struct sockaddr *) &remote, &len);
         }
         //cerr << "MAIN: Connection established.." << endl;
@@ -326,7 +324,6 @@ main(int argc, char *argv[]) {
     return (0);
 }
 
-
 /***************************************************
  * insertInQueue Function
  ***************************************************/
@@ -335,11 +332,8 @@ void insertInQueue(FILE_DETAILS file) {
     m.lock();
     //cerr << "READY_QUEUE: Inserted request in ready queue!" << " \"" << file.buf << "\"" << endl;
     ready_queue.push(file);
-
-
     m.unlock();
 }
-
 
 /***************************************************
  * scheduler Function
@@ -348,11 +342,6 @@ void insertInQueue(FILE_DETAILS file) {
 void *scheduler(void* threadid) {
     //cerr << "SCHED: Waiting time in secs = " << to_string(t) << endl;
     while (difftime(time(NULL), start_time) < t);
-
-    //while (!ready_queue.empty()) {
-    //  cerr <<"Value : "<< ready_queue.top().file_name << endl;
-    //   ready_queue.pop();
-    //}
     while (true) {
         if (pass_req.set)
             continue;
@@ -364,7 +353,7 @@ void *scheduler(void* threadid) {
             //cerr << "SCHED: Executing threads count: " << count << endl;
             p.lock();
             pass_req = ready_queue.top();
-            //cerr << "SCHED: File Name " << pass_req.file_name << endl;
+            cerr << "SCHED: File Name " << pass_req.file_name << endl;
             pass_req.set = true;
             ready_queue.pop();
             p.unlock();
@@ -374,7 +363,6 @@ void *scheduler(void* threadid) {
     }
 }
 
-
 /***************************************************
  * worker Function
  ***************************************************/
@@ -383,7 +371,6 @@ void *worker(void* threadid) {
     string tid = to_string((intptr_t) threadid);
     //cerr << "WORKER " << tid << ": Entering..." << endl;
     //-----------------------------------------------------------------------------
-    struct stat info;
     struct HTTP_HEADER header;
     struct HTTP_RESPONSE response;
     struct FILE_DETAILS *f;
@@ -416,12 +403,12 @@ void *worker(void* threadid) {
 
         //-----------------------------------------------------------------------------
         if (f->GET) {
-            //cerr << "WORKER " << tid << ": Opening requested file => " << f->file_name << endl;
+            cerr << "WORKER " << tid << ": Opening requested file => " << f->file_name << endl;
             ifstream open_file;
             open_file.open(f->file_name);
             if (!open_file.is_open()) {
                 status = 404;
-                //cerr << "WORKER " << tid << ": Requested file not found!" << endl;
+                cerr << "WORKER " << tid << ": Requested file not found!" << endl;
                 if (f->dir != NULL && string(f->dir).length() > 1) {
                     string dirctry = dirListing(f->dir).c_str();
                     //cerr << "WORKER " << tid << ": Directory ==>" << dirctry << endl;
@@ -437,6 +424,7 @@ void *worker(void* threadid) {
         }
         //-----------------------------------------------------------------------------
         string status_msg = status == 200 ? "OK" : "FILE NOT FOUND";
+        //cerr << "WORKER " << tid << ": status message : \n" << status_msg << endl;
         string temp = string(f->file_name);
         string file_type = temp.substr(temp.find_last_of(".") + 1);
         if (file_type == "html") {
@@ -447,13 +435,14 @@ void *worker(void* threadid) {
         if (status == 404) {
             file_type = "text/plain";
         }
-        header.content_len = f->GET == true ? f ->file_size : 0;
+        //cerr << "WORKER " << tid << ": file_type : \n" << file_type << endl;
+        header.content_len = f ->file_size;
         header.content_type = file_type;
         header.last_modified = f->last_modified;
         header.resp_time = time(NULL);
         header.server = "myhttpd v0.1";
         response.header = header;
-
+        //cerr << "WORKER " << tid << ": HEADER is SET !\n" << file_type << endl;
         //-----------------------------------------------------------------------------
         string s = " HTTP/1.1 " + to_string(status) + " " + status_msg + "\r\n" +
                 " Date: " + formatDate(&header.resp_time, 1) + "\r\n" +
@@ -465,15 +454,17 @@ void *worker(void* threadid) {
         //-----------------------------------------------------------------------------
         char* resp;
         //cerr << "Worker "<< f->dir;
-        if ((f->GET && status == 200) || (f->GET && status == 404 && f->dir != NULL && sizeof (f->dir) > 1)) {
+        if ((f->GET && status == 200) || (f->GET && status == 404 && f->dir != NULL && string(f->dir).length() > 1)) {
+            //cerr << "WORKER " << tid << ": HEADER + RESPONSE \n" << file_type << endl;
             resp = new char[strlen(s.c_str()) + strlen(response.content) + 1];
             memcpy(resp, s.c_str(), strlen(s.c_str()));
             memcpy(resp + strlen(s.c_str()), response.content, strlen(response.content));
             send(f->client_socket, resp, strlen(resp), 0);
-            cerr << "WORKER " << tid << ": sent response to client : " << resp << endl;
+            cerr << "WORKER " << tid << ": sent response to client : \n" << resp << endl;
         } else {
+            //cerr << "WORKER " << tid << ": HEADER \n" << file_type << endl;
             send(f->client_socket, s.c_str(), strlen(s.c_str()), 0);
-            cerr << "WORKER " << tid << ": sent header to client : " << s << endl;
+            cerr << "WORKER " << tid << ": sent header to client : \n" << s << endl;
         }
         //-----------------------------------------------------------------------------
         c.lock();
@@ -483,7 +474,6 @@ void *worker(void* threadid) {
         close(f->client_socket);
     }
 }
-
 
 /***************************************************
  * setup_server Function
@@ -540,7 +530,6 @@ setup_server() {
     return (newsock);
 }
 
-
 /***************************************************
  * formatDate Function
  ***************************************************/
@@ -554,14 +543,12 @@ string formatDate(time_t * time, int i) {
     return buffer;
 }
 
-
 /***************************************************
  * dirListing Function
  ***************************************************/
 string dirListing(string dir) {
     DIR *directory;
     struct dirent *file1;
-    struct stat finfo;
     string filename;
     string s = string();
     if ((directory = opendir(dir.c_str())) == NULL) {
