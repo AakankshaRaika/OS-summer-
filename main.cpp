@@ -10,30 +10,9 @@
 
 using namespace std;
 
-class FrameContents{
-
-public:
-	int pageNumber;
-	unordered_map <int, int> pageMap;
-	int age;
-	FrameContents();
-	~FrameContents();
-
-	friend bool operator<(const FrameContents& lhs, const FrameContents& rhs)
-	{
-		
-		if (lhs.pageMap.at(lhs.pageNumber) < rhs.pageMap.at(rhs.pageNumber))
-			return true;
-		else if (lhs.pageMap.at(lhs.pageNumber) > rhs.pageMap(rhs.pageNumber))
-			return false;
-		else{
-			return lhs.age <= rhs.age;
-		}
-	}
-};
 
 
-
+unordered_map<int, int> pageMap;
 vector<int> inFile(); //to get file
 void onStart();       //start page
 int fifo(vector<int> pageVector, int frameNum);
@@ -41,6 +20,32 @@ int lfu(vector<int> pageVector, int frameNum);
 int lruStack(vector<int> pageVector, int frameNum);
 bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replacemens);
 bool checkDuplicate(stack<int>& frameStack, int page);
+
+class FrameContents{
+
+public:
+	int pageNumber;
+	int age;
+	FrameContents();
+	~FrameContents();
+
+	friend bool operator<(const FrameContents& lhs, const FrameContents& rhs)
+	{
+		
+		if (pageMap.at(lhs.pageNumber) < pageMap.at(rhs.pageNumber)){
+			return true;
+		}
+		else{
+			if (pageMap.at(lhs.pageNumber) == pageMap.at(rhs.pageNumber)){
+				return(lhs.age < rhs.age);
+			}
+			else{
+				return false;
+			}
+		}
+	}
+};
+
 
 
 int main(){
@@ -71,6 +76,9 @@ void onStart(){
 
 	cout << "LRU-STACK\n";
 	cout << "Replacements: " << lruStack(holdPages, frameNum) << endl;
+
+	cout << "LFU\n";
+	cout << "Replacements: " << lfu(holdPages, frameNum) << endl;
 
 }
 
@@ -145,15 +153,31 @@ int fifo(vector<int> pageVector, int frameNum){
 int lfu(vector<int> pageVector, int frameNum){
 	priority_queue<FrameContents> priorQueueFrame;
 	FrameContents tempFrame;
+	FrameContents deletePage;
 	int countPages = 0;
+	
 
 	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
-		tempFrame.age = *it;
-		tempFrame.pageNumber = countPages;
-		if (tempFrame.pageMap.find(*it) == tempFrame.pageMap.end()){
-			
+		if (pageMap.find(*it) == pageMap.end()){
+			tempFrame.age = *it;
+			tempFrame.pageNumber = countPages;
+			pageMap.insert({ *it, 0 });
+			if (priorQueueFrame.size() < frameNum){
+				priorQueueFrame.push(tempFrame);
+			}
+			else{
+				deletePage = priorQueueFrame.top();
+				pageMap.erase(deletePage.pageNumber);
+				priorQueueFrame.push(tempFrame);
+				
+			}
+			cout << "miss\n";
 		}
-		countPages++
+		else{
+			cout << "hit\n";
+			pageMap.at(*it) = pageMap.at(*it) + 1;
+		}
+		countPages++;
 	}
 	return 0;
 }
