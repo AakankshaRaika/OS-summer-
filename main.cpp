@@ -1,261 +1,287 @@
-/*
- * soc.c - program to open sockets to remote machines
- *
- * $Author: kensmith $
- * $Id: soc.c 6 2009-07-03 03:18:54Z kensmith $
- */
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <stack>
+#include <unordered_map>
+#include <queue>
 
-//static char svnid[] = "$Id: soc.c 6 2009-07-03 03:18:54Z kensmith $";
-
-#define	BUF_LEN	8192
-
-#include	<stdio.h>
-#include	<stdlib.h>
-#include	<string.h>
-#include	<ctype.h>
-#include	<sys/types.h>
-#include	<sys/socket.h>
-#include	<netdb.h>
-#include	<netinet/in.h>
-#include	<inttypes.h>
-#include        <unistd.h>
-#include        <netdb.h>
-#include	<iostream>
-#include	<pthread.h>
-#include	<time.h>
-#include	<queue>
-#include	<ctime>
 using namespace std;
 
-struct FILES_DETAILS{
-	time_t timer;
-        int file_size;
-        string file_name;
-        string GET_HEAD;
-        string option;
-};
-bool sjf = false;
+class FrameContents{
 
-bool operator<(const FILES_DETAILS& lhs, const FILES_DETAILS& rhs){
-	if(sjf == true){
-		return lhs.file_size < rhs.file_size;
+public:
+	int pageNumber;
+	int pageAge;
+	int pageFifoNum;
+	FrameContents();
+	~FrameContents();
+};
+
+vector<int> inFile(); //to get file
+void onStart();       //start page
+void initializeVector(vector<FrameContents>& frameVector);
+int fifo(vector<int> pageVector, int frameNum);
+int lru(vector<int> pageVector, int frameNum);
+int lfu(vector<int> pageVector, int frameNum);
+void incrementFrameAge(vector<FrameContents>& frameVector);
+int lruStack(vector<int> pageVector, int frameNum);
+bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replacemens);
+void removeBottomPage(stack<int>& frameStack);
+bool checkDuplicate(stack<int>& frameStack, int page);
+
+
+int main(){
+	onStart();
+	return 0;
+}
+
+//constructor
+FrameContents::FrameContents(){
+	pageAge = 0;
+	pageNumber = 0;
+}
+
+//deconstructor
+FrameContents::~FrameContents(){
+
+}
+
+void onStart(){
+	int frameNum = 0;
+	vector<int> holdPages;
+
+	cout << "Enter the frames you wish to use\n"; //error check?
+	cin >> frameNum;
+	holdPages = inFile();  //getting pages 
+
+	cout << "FIFO protocol: \n";
+	cout << "Replacements: " << fifo(holdPages, frameNum) << endl;
+
+	cout << "LRU protocol\n";
+	cout << "Replacements: " << lru(holdPages, frameNum) << endl;
+
+	cout << "LRU-STACK\n";
+	cout << "Replacements: " << lruStack(holdPages, frameNum) << endl;
+	
+}
+
+vector<int> inFile(){
+	string line;
+	string filePath;
+	vector<int> holdFrames;
+
+	cout << "Please enter the full file path\n"; //error check?
+	cin >> filePath;
+	ifstream myfile(filePath);
+	if (myfile.is_open())   //opening file path to put frames in vector
+	{
+		int getNum = 0;
+		while (myfile >> getNum)
+		{
+			holdFrames.push_back(getNum);
+			//cout << getNum << '\n';
+		}
+		myfile.close();
+	}
+
+	else cout << "Unable to open file\n";
+	return holdFrames;
+}
+
+int fifo(vector<int> pageVector, int frameNum){
+	queue<int> frameQueue;
+	queue<int> tempQueue;
+	int replaceCount = 0;
+	bool duplicate = false;
+
+	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
+		if (frameQueue.size() < frameNum){
+			frameQueue.push(*it);
+			//cout << "miss\n";
+			++replaceCount;
+		}
+		else{
+			while (!frameQueue.empty()){
+				tempQueue.push(frameQueue.front());
+				if (frameQueue.front() == *it){
+					duplicate = true;
+					//cout << "hit\n";
+				}
+				frameQueue.pop();
+			}
+			if (duplicate == true){
+				while (!tempQueue.empty()){
+					frameQueue.push(tempQueue.front());
+					tempQueue.pop();
+				}
+				duplicate = false;
+			}
+			else{
+				//cout << "Miss\n";
+				++replaceCount;
+				while (!tempQueue.empty()){
+					//cout << "In queue: " << tempQueue.front();
+					frameQueue.push(tempQueue.front());
+					tempQueue.pop();
+				}
+				frameQueue.pop();
+				frameQueue.push(*it);
+			}
+		}
+	}
+
+	return replaceCount;
+}
+
+int lru(vector<int> pageVector, int frameNum){
+	vector<FrameContents> frameVector(frameNum); //holds frame contents
+	int countIncomingPages = 0;
+	int frameCounter = 0;   //to get the index of the frame to replace
+	FrameContents oldestPage; //to store oldest page
+	int oldestIndex = 0;
+	int replaceCount = 0;
+	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){  //to loop through incoming pages
+		bool hit = false;
+		frameCounter = 0;
+		oldestPage.pageAge = -1;
+		for (vector<FrameContents>::iterator iter = frameVector.begin(); iter != frameVector.end(); ++iter){
+			if (iter->pageNumber == *it){  //if the page has been hit
+				cout << "hit\n";
+				hit = true;
+				iter->pageFifoNum = countIncomingPages;   //update the fifo number
+				iter->pageAge = -1;
+				break;
+			}
+			else{   //else find the oldest page and store it in a temp
+				
+					if(oldestPage.pageAge == iter->pageAge && oldestPage.pageFifoNum < iter->pageAge){	
+						oldestIndex = frameCounter;
+						oldestPage.pageAge = iter->pageAge;
+						oldestPage.pageNumber = iter->pageNumber;
+						oldestPage.pageFifoNum = iter->pageFifoNum;
+					}
+					else if (oldestPage.pageAge < iter->pageAge){
+						oldestIndex = frameCounter;
+						oldestPage.pageAge = iter->pageAge;
+						oldestPage.pageNumber = iter->pageNumber;
+						oldestPage.pageFifoNum = iter->pageFifoNum;
+					}
+
+				}
+			
+			frameCounter++;
+		}
+		if (hit == false){
+			cout << "miss\n";
+			replaceCount++;
+			frameVector.at(oldestIndex).pageAge = -1;
+			frameVector.at(oldestIndex).pageFifoNum = countIncomingPages;
+			frameVector.at(oldestIndex).pageNumber = *it;
+		}
+		incrementFrameAge(frameVector);
+		countIncomingPages++;
+	}
+
+	return replaceCount;
+}
+
+int lfu(vector<int> pageVector, int framNum){
+	unordered_map<int,int> frameMap;
+
+
+	return 0;
+}
+
+int lruStack(vector<int> pageVector, int frameNum){
+	stack<int> frameStack;
+	int replacementCount = 0;
+
+	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
+		checkAndReplace(frameStack, frameNum, *it, replacementCount);
+	}
+
+	return replacementCount;
+	
+	
+}
+
+void initializeVector(vector<FrameContents>& frameVector){
+	for (vector<FrameContents>::iterator it = frameVector.begin(); it != frameVector.end(); ++it){
+		it->pageNumber = -1;
+		it->pageAge = 0;
+		it->pageFifoNum = -1;
+	}
+}
+
+void incrementFrameAge(vector<FrameContents>& frameVector){
+	for (vector<FrameContents>::iterator it = frameVector.begin(); it != frameVector.end(); ++it){
+		it->pageAge++;
+	}
+}
+
+//checks for page in stack, if found, puts at top, if not, takes last out and puts replacement at top
+bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replacements){
+	stack<int> tempStack;
+	int pageCheck;
+	bool pageFound = false;
+
+	if (frameStack.size() < frameNum){
+		cout << "miss\n";
+		++replacements;
+		if (checkDuplicate(frameStack, page)){
+
+		}
+		else{
+			frameStack.push(page);
+		}
 	}
 	else{
-		return 0; 
-	}
-} 
-
-
-char *progname;
-char buf[BUF_LEN];
-void usage();
-int setup_client();
-int setup_server();
-
-int s, sock, ch, server, done, bytes, aflg;
-int soctype = SOCK_STREAM;
-char *host = NULL;
-char *port = NULL;
-extern char *optarg;
-extern int optind;
-
-int
-main(int argc,char *argv[])
-{
-	time_t timer;
-	priority_queue<FILES_DETAILS> q;
-	fd_set ready;
-	struct sockaddr_in msgfrom;
-	socklen_t msgsize;
-	union {
-		uint32_t addr;
-		char bytes[4];
-	} fromaddr;
-
-	if ((progname = rindex(argv[0], '/')) == NULL)
-		progname = argv[0];
-	else
-		progname++;
-	while ((ch = getopt(argc, argv, "adsp:h:")) != -1)
-		switch(ch) {
-			case 'a':
-				aflg++;		/* print address in output */
-				break;
-			case 'd':
-				soctype = SOCK_DGRAM;
-				break;
-			case 's':
-				server = 1;
-				break;
-			case 'p':
-				port = optarg;
-				break;
-			case 'h':
-				host = optarg;
-				break;
-			case '?':
-			default:
-				usage();
+		if (checkDuplicate(frameStack, page)){
+			cout << "hit\n";
 		}
-	argc -= optind;
-	if (argc != 0)
-		usage();
-	if (!server && (host == NULL || port == NULL))
-		usage();
-	if (server && host != NULL)
-		usage();
-/*
- * Create socket on local host.
- */
-	if ((s = socket(AF_INET, soctype, 0)) < 0) {
-		perror("socket");
-		exit(1);
-	}
-	if (!server)
-		sock = setup_client();
-	else
-		sock = setup_server();
-/*
- * Set up select(2) on both socket and terminal, anything that comes
- * in on socket goes to terminal, anything that gets typed on terminal
- * goes out socket...
- */
-	while (!done) {
-		FD_ZERO(&ready);
-		FD_SET(sock, &ready);
-		FD_SET(fileno(stdin), &ready);
-		if (select((sock + 1), &ready, 0, 0, 0) < 0) {
-			cerr << ("IF: level 1");
-			cerr << ("select");
-			exit(1);
-		}
-		//client setup
-		if (FD_ISSET(fileno(stdin), &ready)) {
-			cerr << ("IF: level 2");
-			buf[0] = '5';
-                        send(sock, buf, bytes, 0);
-		}
-		msgsize = sizeof(msgfrom);
-		//Server setup
-		if (FD_ISSET(sock, &ready)) {
-			cerr << ("IF: level 3");
-			if ((bytes = recvfrom(sock, buf, BUF_LEN, 0, (struct sockaddr *)&msgfrom, &msgsize)) <= 0) {
-				FILES_DETAILS *tempStruct;
-                                tempStruct->timer = time(&timer);
-				cerr << "In bytes"  << endl;
-                                done++;
-			} else if (aflg) {
-				cerr << "In aflg" << endl;
-				fromaddr.addr = ntohl(msgfrom.sin_addr.s_addr);
-				fprintf(stderr, "%d.%d.%d.%d: ", 0xff & (unsigned int)fromaddr.bytes[0],
-			    	0xff & (unsigned int)fromaddr.bytes[1],
-			    	0xff & (unsigned int)fromaddr.bytes[2],
-			    	0xff & (unsigned int)fromaddr.bytes[3]);
+		else{
+			++replacements;
+			cout << "miss\n";
+			while (!frameStack.empty()){
+				tempStack.push(frameStack.top());
+				frameStack.pop();
 			}
-			write(fileno(stdout), buf, bytes);
-
-		}
+			tempStack.pop();
+			while (!tempStack.empty()){
+				frameStack.push(tempStack.top());
+				tempStack.pop();
+			}
+			frameStack.push(page);
+		}	
 	}
-	return(0);
+	return true;
 }
 
-/*
- * setup_client() - set up socket for the mode of soc running as a
- *		client connecting to a port on a remote machine.
- */
+bool checkDuplicate(stack<int>& frameStack, int page){
+	stack<int> tempStack;
+	int checkPage;
+	bool duplicate = false;
 
-int
-setup_client() {
-
-	struct hostent *hp;
-	struct sockaddr_in serv;
-	struct servent *se;
-
-/*
- * Look up name of remote machine, getting its address.
- */
-	if ((hp = gethostbyname(host)) == NULL) {
-		fprintf(stderr, "%s: %s unknown host\n", progname, host);
-		exit(1);
-	}
-/*
- * Set up the information needed for the socket to be bound to a socket on
- * a remote host.  Needs address family to use, the address of the remote
- * host (obtained above), and the port on the remote host to connect to.
- */
-	serv.sin_family = AF_INET;
-	memcpy(&serv.sin_addr, hp->h_addr, hp->h_length);
-	if (isdigit(*port))
-		serv.sin_port = htons(atoi(port));
-	else {
-		if ((se = getservbyname(port, (char *)NULL)) < (struct servent *) 0) {
-			perror(port);
-			exit(1);
+	while (!frameStack.empty()){
+		checkPage = frameStack.top();
+		if (checkPage == page){
+			frameStack.pop();
+			duplicate = true;
 		}
-		serv.sin_port = se->s_port;
-	}
-/*
- * Try to connect the sockets...
- */
-	if (connect(s, (struct sockaddr *) &serv, sizeof(serv)) < 0) {
-		perror("connect");
-		exit(1);
-	} else
-		fprintf(stderr, "Connected...\n");
-	return(s);
-}
-
-/*
- * setup_server() - set up socket for mode of soc running as a server.
- */
-
-int
-setup_server() {
-	struct sockaddr_in serv, remote;
-	struct servent *se;
-	int newsock;
-        socklen_t len;
-
-	len = sizeof(remote);
-	memset((void *)&serv, 0, sizeof(serv));
-	serv.sin_family = AF_INET;
-	if (port == NULL)
-		serv.sin_port = htons(0);
-	else if (isdigit(*port))
-		serv.sin_port = htons(atoi(port));
-	else {
-		if ((se = getservbyname(port, (char *)NULL)) < (struct servent *) 0) {
-			perror(port);
-			exit(1);
+		if (!frameStack.empty()){
+			tempStack.push(frameStack.top());
+			frameStack.pop();
 		}
-		serv.sin_port = se->s_port;
 	}
-	if (bind(s, (struct sockaddr *)&serv, sizeof(serv)) < 0) {
-		perror("bind");
-		exit(1);
+	
+	while (!tempStack.empty()){
+		frameStack.push(tempStack.top());
+		tempStack.pop();
 	}
-	if (getsockname(s, (struct sockaddr *) &remote, &len) < 0) {
-		perror("getsockname");
-		exit(1);
-	}
-	fprintf(stderr, "Port number is %d\n", ntohs(remote.sin_port));
-	listen(s, 1);
-	newsock = s;
-	if (soctype == SOCK_STREAM) {
-		fprintf(stderr, "Entering accept() waiting for connection.\n");
-		newsock = accept(s, (struct sockaddr *) &remote, &len);
-	}
-	return(newsock);
-}
-
-/*
- * usage - print usage string and exit
- */
-
-void
-usage()
-{
-	fprintf(stderr, "usage: %s -h host -p port\n", progname);
-	fprintf(stderr, "usage: %s -s [-p port]\n", progname);
-	exit(1);
+	if (duplicate)
+		frameStack.push(page);
+	return duplicate;
+	
 }
