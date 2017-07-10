@@ -18,6 +18,7 @@ void onStart();       //start page
 int fifo(vector<int> pageVector, int frameNum);
 int lfu(vector<int> pageVector, int frameNum);
 int lruStack(vector<int> pageVector, int frameNum);
+vector<pair<int,string>> lru_ref8(stack<int>& frameStack, int frameNum);
 bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replacemens);
 bool checkDuplicate(stack<int>& frameStack, int page);
 
