@@ -113,16 +113,37 @@ int fifo(vector<int> pageVector, int frameNum){
 
 	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
 		if (frameQueue.size() < frameNum){
-			frameQueue.push(*it);
-			//cout << "miss\n";
-			++replaceCount;
+			bool dupe = false;
+			while (!frameQueue.empty()){
+				tempQueue.push(frameQueue.front());
+				if (frameQueue.front() == *it){
+					dupe = true;
+				}
+				frameQueue.pop();
+			}
+			if (dupe){
+				while (!tempQueue.empty()){
+					frameQueue.push(tempQueue.front());
+					tempQueue.pop();
+				}
+			}
+			else{
+				while (!tempQueue.empty()){
+					frameQueue.push(tempQueue.front());
+					tempQueue.pop();
+				}
+				frameQueue.push(*it);
+			}
+			
+			cout << "miss\n";
+			//++replaceCount;
 		}
 		else{
 			while (!frameQueue.empty()){
 				tempQueue.push(frameQueue.front());
 				if (frameQueue.front() == *it){
 					duplicate = true;
-					//cout << "hit\n";
+					cout << "hit\n";
 				}
 				frameQueue.pop();
 			}
@@ -134,7 +155,7 @@ int fifo(vector<int> pageVector, int frameNum){
 				duplicate = false;
 			}
 			else{
-				//cout << "Miss\n";
+				cout << "replace\n";
 				++replaceCount;
 				while (!tempQueue.empty()){
 					//cout << "In queue: " << tempQueue.front();
@@ -159,17 +180,19 @@ int lfu(vector<int> pageVector, int frameNum){
 
 	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
 		if (pageMap.find(*it) == pageMap.end()){
-			tempFrame.age = *it;
-			tempFrame.pageNumber = countPages;
+			tempFrame.age = countPages;
+			tempFrame.pageNumber = *it;
 			pageMap.insert({ *it, 0 });
+			cout << "break1\n";
 			if (priorQueueFrame.size() < frameNum){
+				cout << "break2\n";
 				priorQueueFrame.push(tempFrame);
 			}
 			else{
+				cout << "break3\n";
 				deletePage = priorQueueFrame.top();
 				pageMap.erase(deletePage.pageNumber);
 				priorQueueFrame.push(tempFrame);
-				
 			}
 			cout << "miss\n";
 		}
@@ -200,7 +223,7 @@ bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replac
 
 	if (frameStack.size() < frameNum){
 		cout << "miss\n";
-		++replacements;
+		//++replacements;
 		if (checkDuplicate(frameStack, page)){
 
 		}
@@ -214,7 +237,7 @@ bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replac
 		}
 		else{
 			++replacements;
-			cout << "miss\n";
+			cout << "replace\n";
 			while (!frameStack.empty()){
 				tempStack.push(frameStack.top());
 				frameStack.pop();
