@@ -32,12 +32,12 @@ public:
 	friend bool operator<(const FrameContents& lhs, const FrameContents& rhs)
 	{
 		
-		if (pageMap.at(lhs.pageNumber) < pageMap.at(rhs.pageNumber)){
+		if (pageMap.at(lhs.pageNumber) > pageMap.at(rhs.pageNumber)){
 			return true;
 		}
 		else{
 			if (pageMap.at(lhs.pageNumber) == pageMap.at(rhs.pageNumber)){
-				return(lhs.age < rhs.age);
+				return(lhs.age > rhs.age);
 			}
 			else{
 				return false;
@@ -176,33 +176,73 @@ int lfu(vector<int> pageVector, int frameNum){
 	FrameContents tempFrame;
 	FrameContents deletePage;
 	int countPages = 0;
+	int replacements = 0;
 	
 
 	for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it){
-		if (pageMap.find(*it) == pageMap.end()){
+		cout << "*it is: " << *it << endl;
+		auto search = pageMap.find(*it);
+		if (search == pageMap.end()){
 			tempFrame.age = countPages;
 			tempFrame.pageNumber = *it;
-			pageMap.insert({ *it, 0 });
-			cout << "break1\n";
+			pageMap.insert({ *it, 1 });
 			if (priorQueueFrame.size() < frameNum){
-				cout << "break2\n";
 				priorQueueFrame.push(tempFrame);
+				cout << "miss\n";
 			}
 			else{
-				cout << "break3\n";
+				replacements++;
+				priority_queue<FrameContents> tempPq;
 				deletePage = priorQueueFrame.top();
+				cout << "break7\n";
+				cout << "break4\n";
+				for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
+					std::cout << " " << it->first << ":" << it->second;
+				priorQueueFrame.pop();
+				cout << "break2\n";
 				pageMap.erase(deletePage.pageNumber);
+				cout << "break3\n";
 				priorQueueFrame.push(tempFrame);
+				while (!priorQueueFrame.empty()){
+					cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
+						priorQueueFrame.top().pageNumber << "hash count: " <<
+						pageMap.at(priorQueueFrame.top().pageNumber) << endl;
+					tempPq.push(priorQueueFrame.top());
+					priorQueueFrame.pop();
+				}
+				while (!tempPq.empty()){
+					priorQueueFrame.push(tempPq.top());
+					tempPq.pop();
+				}
+				cout << "replace\n";
 			}
-			cout << "miss\n";
 		}
 		else{
+			priority_queue<FrameContents> tempPq;
 			cout << "hit\n";
-			pageMap.at(*it) = pageMap.at(*it) + 1;
+			int temp = pageMap.at(*it) + 1;
+			cout << "temp " << temp;
+			pageMap[*it] = temp;
+			//pageMap.at(*it) = pageMap.at(*it) + 1;
+			while (!priorQueueFrame.empty()){
+				cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
+					priorQueueFrame.top().pageNumber << "hash count: " <<
+					pageMap.at(priorQueueFrame.top().pageNumber) << endl;
+				tempPq.push(priorQueueFrame.top());
+				priorQueueFrame.pop();
+			}
+			while (!tempPq.empty()){
+				priorQueueFrame.push(tempPq.top());
+				tempPq.pop();
+			}
+			for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
+				std::cout << " " << it->first << ":" << it->second;
+			
+			cout << "\nbreak1\n";
 		}
 		countPages++;
 	}
-	return 0;
+	return replacements;
 }
 
 int lruStack(vector<int> pageVector, int frameNum){
