@@ -215,6 +215,29 @@ int lruStack(vector<int> pageVector, int frameNum){
 
 	return replacements;
 }
+
+//Below updates the bit string for the ref8 algo. 
+vector<pair<int,string>> lru_ref8(stack<int>& frameStack, int frameNum){
+      vector<pair<int,string>> bit_Vstring;
+      cout << "String size for bit_string " << bit_Vstring.size() << endl;
+      string s;
+      for (unsigned int i = 0 ; frameStack.size() > 0 ; i++){
+          int temp = frameStack.top();
+           if(checkDuplicate(frameStack,temp)){    //checking if the page already exists in the string vector for pages. 
+              s.insert(1,(const char*)'1');
+             }
+           else{
+               for(int i = 0 ; i < 7 ; i++){
+                   s.push_back('0');
+               }
+                   s.insert(1,(const char*)'1');
+             }
+           bit_Vstring.resize(8);
+           bit_Vstring.push_back(make_pair(temp,s));
+           frameStack.pop();
+      }
+    return bit_Vstring;
+}
 //checks for page in stack, if found, puts at top, if not, takes last out and puts replacement at top
 bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replacements){
 	stack<int> tempStack;
