@@ -127,7 +127,11 @@ void onStart() {
         t = clock() - t;
     } else if (replacementPolicy == "LRU-REF8") {
         t = clock();
-        pageReplacements = lfu(holdPages, numOfFrames);
+        stack<int> my_s;
+        for(int i = 0 ; i < holdPages.size() ; i++){
+               my_s.push(holdPages[i]);
+        }
+        lru_ref8(my_s, numOfFrames);      //Make this to it returns int....
         t = clock() - t;
     }
     algoTime = (double(t) / CLOCKS_PER_SEC)*100.0;
