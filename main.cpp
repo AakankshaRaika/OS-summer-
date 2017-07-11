@@ -43,7 +43,7 @@ struct clock {
 
 int numOfFrames = 5;
 string filePath;
-string replacementPolicy = "FIFO";
+string replacementPolicy = "LRU-CLOCK";
 
 vector<int> inFile(); //to get file
 void onStart(); //start page
@@ -59,6 +59,8 @@ void removeBottomPage(stack<int>& frameStack);
 bool checkDuplicate(stack<int>& frameStack, int page);
 void printResults(int pageReplacements, int optimalPageRepl, double algoTime, double optimalTime, string replacementPolicy);
 vector<pair<int, string>> lru_ref8(stack<int>& frameStack, int frameNum);
+int incrementVictimPointer(int currentVal, int frameNum);
+int lruClock(vector<int> pageVector, int frameNum);
 
 int main(int argc, char *argv[]) {
     int ch;
@@ -74,6 +76,7 @@ int main(int argc, char *argv[]) {
                         << "LRU-CLOCK (Least-recently-used clock implementation –second chance alg.)." << endl
                         << "LRU-REF8 (Least-recently-used Reference-bitImplementation, using 8 reference bits)" << endl;
                 cout << "−i input file : Read the page reference sequence from a specified file. If not given,the sequence should be read from STDIN (ended with ENTER)." << endl;
+                exit(1);
                 break;
             case 'f':
                 numOfFrames = atoi(optarg);
@@ -123,15 +126,11 @@ void onStart() {
         t = clock() - t;
     } else if (replacementPolicy == "LRU-CLOCK") {
         t = clock();
-        pageReplacements = lfu(holdPages, numOfFrames);
+        pageReplacements = lruClock(holdPages, numOfFrames);
         t = clock() - t;
     } else if (replacementPolicy == "LRU-REF8") {
         t = clock();
-        stack<int> my_s;
-        for(int i = 0 ; i < holdPages.size() ; i++){
-               my_s.push(holdPages[i]);
-        }
-        lru_ref8(my_s, numOfFrames);      //Make this to it returns int....
+        pageReplacements = lfu(holdPages, numOfFrames);
         t = clock() - t;
     }
     algoTime = (double(t) / CLOCKS_PER_SEC)*100.0;
@@ -145,7 +144,7 @@ void onStart() {
 void printResults(int pageReplacements, int optimalPageRepl, double algoTime, double optimalTime, string replacementPolicy) {
     cout << "# of page replacements with " + replacementPolicy + "\t:" << to_string(pageReplacements) << endl;
     cout << "# of page replacements with Optimal\t:" << to_string(optimalPageRepl) << endl;
-    cout << "% page replacement penalty using " + replacementPolicy + "\t:" << to_string((double)(pageReplacements - optimalPageRepl) / optimalPageRepl) + "%" << endl;
+    cout << "% page replacement penalty using " + replacementPolicy + "\t:" << to_string((double) (pageReplacements - optimalPageRepl) / optimalPageRepl) + "%" << endl;
     cout << endl;
     cout << "Total time to run " + replacementPolicy + " Algorithm\t:" << to_string(algoTime * 1000) + "msec" << endl;
     cout << "Total time to run Optimal Algorithm\t:" << to_string(optimalTime * 1000) + "msec" << endl;
@@ -412,6 +411,67 @@ int optimal(vector<int> pageVector, int frameNum) {
     return replacementCount;
 }
 
+int lruClock(vector<int> pageVector, int frameNum) {
+    int replacementCount = 0, available = frameNum, p = 0, victimPointer = 0;
+    int frames[frameNum], secChanceBit[frameNum];
+    for (int i = 0; i < frameNum; i++) {
+        frames[i] = -1;
+        secChanceBit[i] = -1;
+    }
+    while (p < pageVector.size()) {
+        bool hit = false, miss = false;
+        for (int i = 0; i < frameNum; i++) {
+            if (frames[i] == pageVector[p]) {
+                p++;
+                secChanceBit[i] = 1;
+                hit = true;
+                break;
+            }
+            if (frames[i] == -1) {
+                miss = true;
+                break;
+            }
+        }
+        if (hit)
+            continue;
+        else
+            miss = true;
+        if (miss) {
+            if (available > 0) {
+                frames[frameNum - available] = pageVector[p];
+                secChanceBit[frameNum - available] = 0;
+                --available;
+                ++p;
+                victimPointer = incrementVictimPointer(victimPointer, frameNum);
+            } else {
+                replacementCount++;
+                while(true) {
+                    if (secChanceBit[victimPointer] == 0) {
+                        frames[victimPointer] = pageVector[p];
+                        secChanceBit[victimPointer] = 0;
+                        break;
+                    } else {
+                        secChanceBit[victimPointer] = 0;
+                    }
+                    victimPointer = incrementVictimPointer(victimPointer, frameNum);
+                }
+            }
+        }
+        cout << "frames -> ";
+        for (int i = 0; i < frameNum; i++) {
+            cout << " " << frames[i];
+        }
+        cout << endl;
+    }
+    return replacementCount;
+}
+
+int incrementVictimPointer(int currentVal, int frameNum) {
+    if (currentVal + 1 == frameNum) {
+        return 0;
+    }
+    return ++currentVal;
+}
 
 //checks for page in stack, if found, puts at top, if not, takes last out and puts replacement at top
 
