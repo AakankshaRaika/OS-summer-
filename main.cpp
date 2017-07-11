@@ -182,11 +182,11 @@ vector<int> inFile() {
             myfile.close();
         } else cout << "Unable to open file\n";
     }
-    cout << "Reference String : ";
-    for (int i = 0; i < holdFrames.size(); i++) {
-        cout << " " << holdFrames[i];
-    }
-    cout << endl;
+    //    cout << "Reference String : ";
+    //    for (int i = 0; i < holdFrames.size(); i++) {
+    //        cout << " " << holdFrames[i];
+    //    }
+    //    cout << endl;
     return holdFrames;
 }
 
@@ -219,14 +219,12 @@ int fifo(vector<int> pageVector, int frameNum) {
                 frameQueue.push(*it);
             }
 
-            cout << "miss\n";
-            //++replaceCount;
+
         } else {
             while (!frameQueue.empty()) {
                 tempQueue.push(frameQueue.front());
                 if (frameQueue.front() == *it) {
                     duplicate = true;
-                    cout << "hit\n";
                 }
                 frameQueue.pop();
             }
@@ -237,10 +235,8 @@ int fifo(vector<int> pageVector, int frameNum) {
                 }
                 duplicate = false;
             } else {
-                cout << "replace\n";
                 ++replaceCount;
                 while (!tempQueue.empty()) {
-                    //cout << "In queue: " << tempQueue.front();
                     frameQueue.push(tempQueue.front());
                     tempQueue.pop();
                 }
@@ -262,7 +258,6 @@ int lfu(vector<int> pageVector, int frameNum) {
 
 
     for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it) {
-        cout << "*it is: " << *it << endl;
         auto search = pageMap.find(*it);
         if (search == pageMap.end()) {
             tempFrame.age = countPages;
@@ -270,24 +265,15 @@ int lfu(vector<int> pageVector, int frameNum) {
             pageMap.insert({*it, 1});
             if (priorQueueFrame.size() < frameNum) {
                 priorQueueFrame.push(tempFrame);
-                cout << "miss\n";
             } else {
                 replacements++;
                 priority_queue<FrameContents> tempPq;
                 deletePage = priorQueueFrame.top();
-                cout << "break7\n";
-                cout << "break4\n";
                 for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
-                    std::cout << " " << it->first << ":" << it->second;
-                priorQueueFrame.pop();
-                cout << "break2\n";
+                    priorQueueFrame.pop();
                 pageMap.erase(deletePage.pageNumber);
-                cout << "break3\n";
                 priorQueueFrame.push(tempFrame);
                 while (!priorQueueFrame.empty()) {
-                    cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
-                            priorQueueFrame.top().pageNumber << "hash count: " <<
-                            pageMap.at(priorQueueFrame.top().pageNumber) << endl;
                     tempPq.push(priorQueueFrame.top());
                     priorQueueFrame.pop();
                 }
@@ -295,19 +281,13 @@ int lfu(vector<int> pageVector, int frameNum) {
                     priorQueueFrame.push(tempPq.top());
                     tempPq.pop();
                 }
-                cout << "replace\n";
             }
         } else {
             priority_queue<FrameContents> tempPq;
-            cout << "hit\n";
             int temp = pageMap.at(*it) + 1;
-            cout << "temp " << temp;
             pageMap[*it] = temp;
             //pageMap.at(*it) = pageMap.at(*it) + 1;
             while (!priorQueueFrame.empty()) {
-                cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
-                        priorQueueFrame.top().pageNumber << "hash count: " <<
-                        pageMap.at(priorQueueFrame.top().pageNumber) << endl;
                 tempPq.push(priorQueueFrame.top());
                 priorQueueFrame.pop();
             }
@@ -315,10 +295,7 @@ int lfu(vector<int> pageVector, int frameNum) {
                 priorQueueFrame.push(tempPq.top());
                 tempPq.pop();
             }
-            for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
-                std::cout << " " << it->first << ":" << it->second;
 
-            cout << "\nbreak1\n";
         }
         countPages++;
     }
@@ -348,10 +325,8 @@ int optimal(vector<int> pageVector, int frameNum) {
     while (p < pageVector.size()) {
         minCount = ++counter;
         hit = miss = false;
-        cout << "OPT: Page number : " << to_string(p) << " page value :" << to_string(pageVector[p]) << "  ==== ";
         for (int i = 0; i < frameNum; i++) {
             if (frames[i] == pageVector[p]) {
-                cout << "OPT: it is a hit!" << endl;
                 p++;
                 hit = true;
                 break;
@@ -404,11 +379,11 @@ int optimal(vector<int> pageVector, int frameNum) {
                 insertionOrder[maxDistIndex] = counter;
             }
         }
-        cout << "frames -> ";
-        for (int i = 0; i < frameNum; i++) {
-            cout << " " << frames[i];
-        }
-        cout << endl;
+//        cout << "frames -> ";
+//        for (int i = 0; i < frameNum; i++) {
+//            cout << " " << frames[i];
+//        }
+//        cout << endl;
     }
     return replacementCount;
 }
@@ -459,11 +434,11 @@ int lruClock(vector<int> pageVector, int frameNum) {
                 }
             }
         }
-        cout << "frames -> ";
-        for (int i = 0; i < frameNum; i++) {
-            cout << " " << frames[i];
-        }
-        cout << endl;
+//        cout << "frames -> ";
+//        for (int i = 0; i < frameNum; i++) {
+//            cout << " " << frames[i];
+//        }
+//        cout << endl;
     }
     return replacementCount;
 }
@@ -481,11 +456,6 @@ int lruRef8(vector<int> pageVector, int frameNum) {
         bool found = false, hit = false, miss = false;
         int page = pageVector[p++];
 
-        cout << "frames (s)-> ";
-        for (int i = 0; i < frameNum; i++) {
-            cout << " " << frames[i];
-        }
-        cout << endl;
         for (int i = 0; i < bitmap.size(); i++) {
             if (get<0>(bitmap[i]) == page) {
                 found = true;
@@ -541,11 +511,11 @@ int lruRef8(vector<int> pageVector, int frameNum) {
             }
 
         }
-        cout << "frames (e)-> ";
-        for (int i = 0; i < frameNum; i++) {
-            cout << " " << frames[i];
-        }
-        cout << endl;
+//        cout << "frames (e)-> ";
+//        for (int i = 0; i < frameNum; i++) {
+//            cout << " " << frames[i];
+//        }
+//        cout << endl;
     }
     return replacementCount;
 }
@@ -565,7 +535,7 @@ bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replac
     bool pageFound = false;
 
     if (frameStack.size() < frameNum) {
-        cout << "miss\n";
+        //cout << "miss\n";
         ++replacements;
         if (checkDuplicate(frameStack, page)) {
 
@@ -574,10 +544,10 @@ bool checkAndReplace(stack<int>& frameStack, int frameNum, int page, int& replac
         }
     } else {
         if (checkDuplicate(frameStack, page)) {
-            cout << "hit\n";
+            //cout << "hit\n";
         } else {
             ++replacements;
-            cout << "miss\n";
+            //cout << "miss\n";
             while (!frameStack.empty()) {
                 tempStack.push(frameStack.top());
                 frameStack.pop();
@@ -619,28 +589,3 @@ bool checkDuplicate(stack<int>& frameStack, int page) {
     return duplicate;
 
 }
-/*
-//Below updates the bit string for the ref8 algo. 
-
-vector<pair<int, string>> lru_ref8(stack<int>& frameStack, int frameNum) {
-    vector<pair<int, string>> bit_Vstring;
-    cout << "String size for bit_string " << bit_Vstring.size() << endl;
-    string s;
-    b
-    for (unsigned int i = 0; frameStack.size() > 0; i++) {
-        int temp = frameStack.top();
-        /*if (checkDuplicate(frameStack, temp)) { //checking if the page already exists in the string vector for pages. 
-            s.insert(1, (const char*) '1');
-        } else {
-            for (int i = 0; i < 7; i++) {
-                s.push_back('0');
-            }
-            s.insert(1, (const char*) '1');
-        }
-        bit_Vstring.resize(8);
-        bit_Vstring.push_back(make_pair(temp, s));
-        frameStack.pop();
-    }
-    return bit_Vstring;
-}
- */
