@@ -44,7 +44,7 @@ struct clock {
 
 int numOfFrames = 5;
 string filePath;
-string replacementPolicy = "LRU-REF8";
+string replacementPolicy = "FIFO";
 
 vector<int> inFile(); //to get file
 void onStart(); //start page
@@ -144,11 +144,11 @@ void onStart() {
 }
 
 void printResults(int pageReplacements, int optimalPageRepl, double algoTime, double optimalTime, string replacementPolicy) {
-    cout << "# of page replacements with " + replacementPolicy + "\t:" << to_string(pageReplacements) << endl;
+    cout << "\n# of page replacements with " + replacementPolicy + "\t\t:" << to_string(pageReplacements) << endl;
     cout << "# of page replacements with Optimal\t:" << to_string(optimalPageRepl) << endl;
     cout << "% page replacement penalty using " + replacementPolicy + "\t:" << to_string((double) (pageReplacements - optimalPageRepl) / optimalPageRepl) + "%" << endl;
     cout << endl;
-    cout << "Total time to run " + replacementPolicy + " Algorithm\t:" << to_string(algoTime * 1000) + "msec" << endl;
+    cout << "Total time to run " + replacementPolicy + " Algorithm\t\t:" << to_string(algoTime * 1000) + "msec" << endl;
     cout << "Total time to run Optimal Algorithm\t:" << to_string(optimalTime * 1000) + "msec" << endl;
     if (algoTime < optimalTime) {
         cout << replacementPolicy + " is " + to_string((float) (optimalTime - algoTime) / optimalTime) + "% faster than Optimal algorithm" << endl;
@@ -258,6 +258,7 @@ int lfu(vector<int> pageVector, int frameNum) {
 
 
     for (vector<int>::iterator it = pageVector.begin(); it != pageVector.end(); ++it) {
+        //cout << "*it is: " << *it << endl;
         auto search = pageMap.find(*it);
         if (search == pageMap.end()) {
             tempFrame.age = countPages;
@@ -265,15 +266,24 @@ int lfu(vector<int> pageVector, int frameNum) {
             pageMap.insert({*it, 1});
             if (priorQueueFrame.size() < frameNum) {
                 priorQueueFrame.push(tempFrame);
+                //cout << "miss\n";
             } else {
                 replacements++;
                 priority_queue<FrameContents> tempPq;
                 deletePage = priorQueueFrame.top();
-                for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
-                    priorQueueFrame.pop();
+                //cout << "break7\n";
+                //cout << "break4\n";
+                //for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
+                //  std::cout << " " << it->first << ":" << it->second;
+                priorQueueFrame.pop();
+                //cout << "break2\n";
                 pageMap.erase(deletePage.pageNumber);
+                //cout << "break3\n";
                 priorQueueFrame.push(tempFrame);
                 while (!priorQueueFrame.empty()) {
+                    /*cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
+                            priorQueueFrame.top().pageNumber << "hash count: " <<
+                            pageMap.at(priorQueueFrame.top().pageNumber) << endl;*/
                     tempPq.push(priorQueueFrame.top());
                     priorQueueFrame.pop();
                 }
@@ -281,13 +291,19 @@ int lfu(vector<int> pageVector, int frameNum) {
                     priorQueueFrame.push(tempPq.top());
                     tempPq.pop();
                 }
+                //cout << "replace\n";
             }
         } else {
             priority_queue<FrameContents> tempPq;
+            //cout << "hit\n";
             int temp = pageMap.at(*it) + 1;
+            //cout << "temp " << temp;
             pageMap[*it] = temp;
             //pageMap.at(*it) = pageMap.at(*it) + 1;
             while (!priorQueueFrame.empty()) {
+                /*cerr << "PriorQueue contents: age: " << priorQueueFrame.top().age << " number: " <<
+                        priorQueueFrame.top().pageNumber << "hash count: " <<
+                        pageMap.at(priorQueueFrame.top().pageNumber) << endl;*/
                 tempPq.push(priorQueueFrame.top());
                 priorQueueFrame.pop();
             }
@@ -295,7 +311,10 @@ int lfu(vector<int> pageVector, int frameNum) {
                 priorQueueFrame.push(tempPq.top());
                 tempPq.pop();
             }
-
+            /*for (auto it = pageMap.begin(); it != pageMap.end(); ++it)
+                std::cout << " " << it->first << ":" << it->second;
+             */
+            //cout << "\nbreak1\n";
         }
         countPages++;
     }
@@ -379,11 +398,11 @@ int optimal(vector<int> pageVector, int frameNum) {
                 insertionOrder[maxDistIndex] = counter;
             }
         }
-//        cout << "frames -> ";
-//        for (int i = 0; i < frameNum; i++) {
-//            cout << " " << frames[i];
-//        }
-//        cout << endl;
+        //        cout << "frames -> ";
+        //        for (int i = 0; i < frameNum; i++) {
+        //            cout << " " << frames[i];
+        //        }
+        //        cout << endl;
     }
     return replacementCount;
 }
@@ -434,11 +453,11 @@ int lruClock(vector<int> pageVector, int frameNum) {
                 }
             }
         }
-//        cout << "frames -> ";
-//        for (int i = 0; i < frameNum; i++) {
-//            cout << " " << frames[i];
-//        }
-//        cout << endl;
+        //        cout << "frames -> ";
+        //        for (int i = 0; i < frameNum; i++) {
+        //            cout << " " << frames[i];
+        //        }
+        //        cout << endl;
     }
     return replacementCount;
 }
@@ -511,11 +530,11 @@ int lruRef8(vector<int> pageVector, int frameNum) {
             }
 
         }
-//        cout << "frames (e)-> ";
-//        for (int i = 0; i < frameNum; i++) {
-//            cout << " " << frames[i];
-//        }
-//        cout << endl;
+        //        cout << "frames (e)-> ";
+        //        for (int i = 0; i < frameNum; i++) {
+        //            cout << " " << frames[i];
+        //        }
+        //        cout << endl;
     }
     return replacementCount;
 }
