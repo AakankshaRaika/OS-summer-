@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <iterator>
 #include <unordered_map>
+#include <string.h>
 
 using namespace std;
 
@@ -43,7 +44,7 @@ struct clock {
 
 int numOfFrames = 5;
 string filePath;
-string replacementPolicy = "LRU-CLOCK";
+string replacementPolicy = "LRU-REF8";
 
 vector<int> inFile(); //to get file
 void onStart(); //start page
@@ -61,6 +62,7 @@ void printResults(int pageReplacements, int optimalPageRepl, double algoTime, do
 vector<pair<int, string>> lru_ref8(stack<int>& frameStack, int frameNum);
 int incrementVictimPointer(int currentVal, int frameNum);
 int lruClock(vector<int> pageVector, int frameNum);
+int lruRef8(vector<int> pageVector, int frameNum);
 
 int main(int argc, char *argv[]) {
     int ch;
@@ -130,7 +132,7 @@ void onStart() {
         t = clock() - t;
     } else if (replacementPolicy == "LRU-REF8") {
         t = clock();
-        pageReplacements = lfu(holdPages, numOfFrames);
+        pageReplacements = lruRef8(holdPages, numOfFrames);
         t = clock() - t;
     }
     algoTime = (double(t) / CLOCKS_PER_SEC)*100.0;
@@ -445,7 +447,7 @@ int lruClock(vector<int> pageVector, int frameNum) {
                 victimPointer = incrementVictimPointer(victimPointer, frameNum);
             } else {
                 replacementCount++;
-                while(true) {
+                while (true) {
                     if (secChanceBit[victimPointer] == 0) {
                         frames[victimPointer] = pageVector[p];
                         secChanceBit[victimPointer] = 0;
@@ -458,6 +460,88 @@ int lruClock(vector<int> pageVector, int frameNum) {
             }
         }
         cout << "frames -> ";
+        for (int i = 0; i < frameNum; i++) {
+            cout << " " << frames[i];
+        }
+        cout << endl;
+    }
+    return replacementCount;
+}
+
+int lruRef8(vector<int> pageVector, int frameNum) {
+    vector<pair<int, string>> bitmap;
+    int p = 0, available = frameNum, replacementCount = 0, max = 0, maxIndex = -1;
+    int frames[frameNum], bitmapLoc[frameNum];
+    for (int i = 0; i < frameNum; i++) {
+        frames[i] = -1;
+        bitmapLoc[i] = -1;
+    }
+    string temp;
+    while (p < pageVector.size()) {
+        bool found = false, hit = false, miss = false;
+        int page = pageVector[p++];
+
+        cout << "frames (s)-> ";
+        for (int i = 0; i < frameNum; i++) {
+            cout << " " << frames[i];
+        }
+        cout << endl;
+        for (int i = 0; i < bitmap.size(); i++) {
+            if (get<0>(bitmap[i]) == page) {
+                found = true;
+                temp = get<1>(bitmap[i]);
+                temp = "1" + temp.substr(0, temp.length() - 1);
+            } else {
+                temp = get<1>(bitmap[i]);
+                temp = "0" + temp.substr(0, temp.length() - 1);
+            }
+            bitmap[i] = make_pair(get<0>(bitmap[i]), temp);
+        }
+        if (!found) {
+            temp = "10000000";
+            bitmap.push_back(make_pair(page, temp));
+        }
+
+        for (int i = 0; i < frameNum; i++) {
+            if (frames[i] == page) {
+                hit = true;
+                break;
+            }
+            if (frames[i] == -1) {
+                miss = true;
+                break;
+            }
+        }
+        if (hit)
+            continue;
+        else
+            miss = true;
+        if (miss) {
+            if (available > 0) {
+                frames[frameNum - available] = page;
+                --available;
+            } else {
+                replacementCount++;
+                for (int i = 0; i < frameNum; i++) {
+                    for (int j = 0; j < bitmap.size(); j++) {
+                        if (get<0>(bitmap[j]) == frames[i]) {
+                            bitmapLoc[i] = string(get<1>(bitmap[j])).find("1");
+                        }
+                    }
+                }
+                max = 0;
+                for (int i = 0; i < frameNum; i++) {
+                    if (bitmapLoc[i] > max) {
+                        max = bitmapLoc[i];
+                        maxIndex = i;
+                    }
+                }
+
+                frames[maxIndex ] = page;
+            }
+
+        }
+        cout << "frames (e)-> ";
         for (int i = 0; i < frameNum; i++) {
             cout << " " << frames[i];
         }
@@ -535,16 +619,17 @@ bool checkDuplicate(stack<int>& frameStack, int page) {
     return duplicate;
 
 }
-
+/*
 //Below updates the bit string for the ref8 algo. 
 
 vector<pair<int, string>> lru_ref8(stack<int>& frameStack, int frameNum) {
     vector<pair<int, string>> bit_Vstring;
     cout << "String size for bit_string " << bit_Vstring.size() << endl;
     string s;
+    b
     for (unsigned int i = 0; frameStack.size() > 0; i++) {
         int temp = frameStack.top();
-        if (checkDuplicate(frameStack, temp)) { //checking if the page already exists in the string vector for pages. 
+        /*if (checkDuplicate(frameStack, temp)) { //checking if the page already exists in the string vector for pages. 
             s.insert(1, (const char*) '1');
         } else {
             for (int i = 0; i < 7; i++) {
@@ -558,3 +643,4 @@ vector<pair<int, string>> lru_ref8(stack<int>& frameStack, int frameNum) {
     }
     return bit_Vstring;
 }
+ */
